@@ -2,7 +2,7 @@ import argparse
 
 parser = argparse.ArgumentParser(prog='gadget.py', description='find ROP gadgets in disassembly file')
 parser.add_argument('strings', nargs='*', type=str, help='strings to search')
-parser.add_argument('-filename', '-f', default='wsf/tutorial1/app/app.txt', help='disassembly file')
+parser.add_argument('-filename', '-f', default='software_attacks/app/app.txt', help='disassembly file')
 parser.add_argument('-display', '-d', type=int, default=1, help='number of instructions to display')
 
 args = parser.parse_args()
