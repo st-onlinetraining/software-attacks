@@ -76,7 +76,7 @@ class HookWeakMethod:
 
 class App:
 
-  def __init__(self, elf_file='wsf/tutorial1/app/app.elf', RAM_is_executable=True):
+  def __init__(self, elf_file='software_attacks/app/app.elf', RAM_is_executable=True):
     self.functions = {}
     self.function_names = {}
     self.ins_counter = 0
