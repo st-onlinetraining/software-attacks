@@ -3,7 +3,8 @@ import lief
 import weakref
 
 class Printf:
-
+  """ Helper class to interpret a printf call from application side and return the formatted string.
+  """
   def __init__(self, emu):
     self.emu = emu
   
@@ -157,6 +158,8 @@ class App:
     return self._emu.reg_read(uc.arm_const.UC_ARM_REG_PC)
 
   def reset(self):
+    """ Reset the microcontroller and restart the application.
+    """
     self._ins_counter = 0
     self._emu.reg_write(uc.arm_const.UC_ARM_REG_SP, self._read32(0x08000000))
     self._emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self._read32(0x08000004))
@@ -226,6 +229,21 @@ class App:
     self._emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self._emu.reg_read(uc.arm_const.UC_ARM_REG_LR))
 
   def send(self, *args, timeout=1):
+    """ Send a command to the application running on the microcontroller.
+
+    A single argument can be passed as a command string, otherwise multiple arguments are concatenated to
+    create a command. Integers are converted into 4 bytes in little endian, before being concatenated.
+
+    Args:
+        *args: a list of strings or integers used to create a command. 
+        timeout (int, optional): Number of seconds to wait for response. Defaults to 1.
+
+    Raises:
+        OverflowError: When the command is longer than 255 bytes.
+
+    Returns:
+        int: The number of clock cycles spent managing the command
+    """
     command = b''
     self._answer = ''
     for arg in args:
@@ -236,7 +254,7 @@ class App:
       else:
         command += arg
     if len(command) > 0xFF:
-       raise OverflowError("command not sent: %d bytes exceed maximum of 255" % (len(command),))
+      raise OverflowError("command not sent: %d bytes exceed maximum of 255" % (len(command),))
     self._cmd_buf = len(command).to_bytes(1, 'little') + command
     self._cmd_idx = 0
     self._ins_counter = 0
@@ -252,17 +270,38 @@ class App:
     return self._ins_counter
 
   def get_answer(self):
+    """ Retrieve the latest answer from the application.
+
+    Returns:
+        str: the answer to the last sent command.
+    """
     return self._answer
   
   def _int2ascii(self, value):
     return (ord('0') + value).to_bytes(1, 'little')
 
   def send_read_slot(self, slot):
+    """ Read a slot from the application.
+
+    Args:
+        slot (int): the index of the slot.
+    """
     self.send('r', self._int2ascii(slot))
 
   def send_write_slot(self, slot, value):
+    """ Write a slot with a given value.
+
+    Args:
+        slot (int): the index of the slot.
+        value (int): the value to write in the slot.
+    """
     self.send('w', self._int2ascii(slot),  str(value))
   
   def send_increment_slot(self, slot):
+    """ Increment the value in a slot.
+
+    Args:
+        slot (int): the index of the slot.
+    """
     self.send('i', self._int2ascii(slot))
 
