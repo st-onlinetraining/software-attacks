@@ -77,35 +77,35 @@ class HookWeakMethod:
 class App:
 
   def __init__(self, elf_file='software_attacks/app/app.elf', RAM_is_executable=True):
-    self.functions = {}
-    self.function_names = {}
-    self.ins_counter = 0
-    self.elf_file = elf_file
-    self.emu = uc.Uc(uc.UC_ARCH_ARM, uc.UC_MODE_THUMB | uc.UC_MODE_MCLASS)
+    self._functions = {}
+    self._function_names = {}
+    self._ins_counter = 0
+    self._elf_file = elf_file
+    self._emu = uc.Uc(uc.UC_ARCH_ARM, uc.UC_MODE_THUMB | uc.UC_MODE_MCLASS)
     #self.emu.mem_map(0x00000000, 0x1000, uc.UC_PROT_ALL) # ugly hack, printf issue ?
-    self.emu.mem_map(0x20000000, 0x10000, uc.UC_PROT_ALL) # make RAM executable for now
-    self.emu.mem_map(0x08000000, 0x10000, uc.UC_PROT_ALL) # make FLASH writable for now
-    self.load()
-    self.emu.mem_protect(0x08000000, 0x10000, uc.UC_PROT_READ | uc.UC_PROT_EXEC)  # make flash non writable
+    self._emu.mem_map(0x20000000, 0x10000, uc.UC_PROT_ALL) # make RAM executable for now
+    self._emu.mem_map(0x08000000, 0x10000, uc.UC_PROT_ALL) # make FLASH writable for now
+    self._load()
+    self._emu.mem_protect(0x08000000, 0x10000, uc.UC_PROT_READ | uc.UC_PROT_EXEC)  # make flash non writable
     if not RAM_is_executable:
-      self.emu.mem_protect(0x20000000, 0x10000, uc.UC_PROT_READ | uc.UC_PROT_WRITE)  # make RAM not executable
-    self.set_hook('puts', HookWeakMethod(self.hook_puts))
-    self.set_hook('putchar', HookWeakMethod(self.hook_putchar))
-    self.set_hook('getchar', HookWeakMethod(self.hook_getchar))
-    self.set_hook('printf', HookWeakMethod(self.hook_printf))
+      self._emu.mem_protect(0x20000000, 0x10000, uc.UC_PROT_READ | uc.UC_PROT_WRITE)  # make RAM not executable
+    self._set_hook('puts', HookWeakMethod(self._hook_puts))
+    self._set_hook('putchar', HookWeakMethod(self._hook_putchar))
+    self._set_hook('getchar', HookWeakMethod(self._hook_getchar))
+    self._set_hook('printf', HookWeakMethod(self._hook_printf))
     #self.set_hook('__sfputc_r', HookWeakMethod(self.hook_))
     #self.emu.hook_add(uc.UC_HOOK_MEM_WRITE, HookWeakMethod(self.hook_write_mem))
     #self.emu.hook_add(uc.UC_HOOK_CODE, HookWeakMethod(self.hook_code), begin=self.functions['receive_command']-1, end=0x08000278)
-    self.emu.hook_add(uc.UC_HOOK_CODE, HookWeakMethod(self.hook_code_count), begin=0x08000000, end=0x08010000)
+    self._emu.hook_add(uc.UC_HOOK_CODE, HookWeakMethod(self._hook_code_count), begin=0x08000000, end=0x08010000)
     self.reset()
 
-  def set_hook(self, function, hook):
-    add = self.functions[function]
-    self.emu.hook_add(uc.UC_HOOK_CODE, hook, begin=add-1, end=add)
+  def _set_hook(self, function, hook):
+    add = self._functions[function]
+    self._emu.hook_add(uc.UC_HOOK_CODE, hook, begin=add-1, end=add)
 
-  def load(self, verbose=False):
+  def _load(self, verbose=False):
     """ Load an .elf file into emu's memory using LIEF """
-    elffile = lief.parse(self.elf_file)
+    elffile = lief.parse(self._elf_file)
     if verbose:
         print(f"[x] Loading .elf ...")
 
@@ -117,17 +117,17 @@ class App:
                         print(
                             f"[=] Writing {section.name} on {section.virtual_address:x} - {section.virtual_address+section.size:x}"
                         )
-                    self.emu.mem_write(section.virtual_address, bytes(section.content))
+                    self._emu.mem_write(section.virtual_address, bytes(section.content))
 
     # lief > 0.10
     try:
         for f in elffile.exported_functions:
             tmpn = f.name
             c = 0
-            while tmpn in self.functions:
+            while tmpn in self._functions:
                 c += 1
                 tmpn = f.name + str(c)
-            self.functions[tmpn] = f.address
+            self._functions[tmpn] = f.address
     except:
         pass
 
@@ -137,31 +137,31 @@ class App:
             try:
                 tmpn = i.name
                 addr = i.value
-                if self.functions[tmpn] != addr:
+                if self._functions[tmpn] != addr:
                     c = 0
-                    while tmpn in self.functions.keys():
+                    while tmpn in self._functions.keys():
                         c += 1
                         tmpn = i.name + str(c)
-                    self.functions[tmpn] = addr
+                    self._functions[tmpn] = addr
             except Exception as e:
                 if verbose:
                     print(e, i)
 
-    self.function_names = {self.functions[x]: x for x in self.functions.keys()}
+    self._function_names = {self._functions[x]: x for x in self._functions.keys()}
 
 
-  def read32(self, address):
-    return int.from_bytes(self.emu.mem_read(address, 4), "little")
+  def _read32(self, address):
+    return int.from_bytes(self._emu.mem_read(address, 4), "little")
 
-  def get_pc(self):
-    return self.emu.reg_read(uc.arm_const.UC_ARM_REG_PC)
+  def _get_pc(self):
+    return self._emu.reg_read(uc.arm_const.UC_ARM_REG_PC)
 
   def reset(self):
-    self.ins_counter = 0
-    self.emu.reg_write(uc.arm_const.UC_ARM_REG_SP, self.read32(0x08000000))
-    self.emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self.read32(0x08000004))
+    self._ins_counter = 0
+    self._emu.reg_write(uc.arm_const.UC_ARM_REG_SP, self._read32(0x08000000))
+    self._emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self._read32(0x08000004))
 
-  def hook_puts(self, emu, address, size, user_data):
+  def _hook_puts(self, emu, address, size, user_data):
     r0 = emu.reg_read(uc.arm_const.UC_ARM_REG_R0)
     s = ''
     while(1):
@@ -171,18 +171,18 @@ class App:
       r0 += 1
       s += chr(c)
     print(s)
-    self.answer += s
-    self.ret()
+    self._answer += s
+    self._ret()
 
-  def hook_putchar(self, emu, address, size, user_data):
+  def _hook_putchar(self, emu, address, size, user_data):
     r0 = emu.reg_read(uc.arm_const.UC_ARM_REG_R0)
     c = chr(r0 & 0xff)
     print(c, end='')
-    self.answer += c
-    self.ret()
+    self._answer += c
+    self._ret()
 
 
-  def hook_write(self, emu, address, size, user_data):
+  def _hook_write(self, emu, address, size, user_data):
     #r0 = emu.reg_read(uc.arm_const.UC_ARM_REG_R0)
     #while(1):
     #  c = emu.mem_read(r0,1)[0]
@@ -192,42 +192,42 @@ class App:
     #  print(chr(c), end='')
     #print('')
     print('WRITE')
-    self.ret()
+    self._ret()
 
-  def hook_getchar(self, emu, address, size, user_data):
-    if self.cmd_idx < len(self.cmd_buf):
-      c = self.cmd_buf[self.cmd_idx]
+  def _hook_getchar(self, emu, address, size, user_data):
+    if self._cmd_idx < len(self._cmd_buf):
+      c = self._cmd_buf[self._cmd_idx]
     else:
       raise NameError('Finished')
     emu.reg_write(uc.arm_const.UC_ARM_REG_R0, c)
-    self.cmd_idx += 1
-    self.ret()
+    self._cmd_idx += 1
+    self._ret()
 
-  def hook_printf(self, emu, address, size, user_data):
+  def _hook_printf(self, emu, address, size, user_data):
     a = Printf(emu).parse()
     print(a, end='')
-    self.answer += a 
-    self.ret()
+    self._answer += a
+    self._ret()
 
 
-  def hook_code(self, emu, address, size, user_data):
+  def _hook_code(self, emu, address, size, user_data):
     print(">>> Tracing instruction at 0x%x, instruction size = 0x%x" %(address, size))
 
-  def hook_code_count(self, emu, address, size, user_data):
-      self.ins_counter += 1
+  def _hook_code_count(self, emu, address, size, user_data):
+      self._ins_counter += 1
 
 
-  def hook_write_mem(self, emu, access, address, size, value, user_data):
+  def _hook_write_mem(self, emu, access, address, size, value, user_data):
     if access == uc.UC_MEM_WRITE:
       print(">>> Writing 0x%x at 0x%x" %(value, address))
 
 
-  def ret(self):
-    self.emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self.emu.reg_read(uc.arm_const.UC_ARM_REG_LR))
+  def _ret(self):
+    self._emu.reg_write(uc.arm_const.UC_ARM_REG_PC, self._emu.reg_read(uc.arm_const.UC_ARM_REG_LR))
 
   def send(self, *args, timeout=1):
     command = b''
-    self.answer = ''
+    self._answer = ''
     for arg in args:
       if isinstance(arg, int):
         command += arg.to_bytes(4, 'little')
@@ -236,32 +236,32 @@ class App:
       else:
         command += arg
 
-    self.cmd_buf = len(command).to_bytes(1, 'little') + command
-    self.cmd_idx = 0
-    self.ins_counter = 0
+    self._cmd_buf = len(command).to_bytes(1, 'little') + command
+    self._cmd_idx = 0
+    self._ins_counter = 0
     try:
-      self.emu.emu_start(self.emu.reg_read(uc.arm_const.UC_ARM_REG_PC)|1, 0x08000295, timeout=timeout*1000000)
-      self.ins_counter = 'timeout'
+      self._emu.emu_start(self._emu.reg_read(uc.arm_const.UC_ARM_REG_PC)|1, 0x08000295, timeout=timeout*1000000)
+      self._ins_counter = 'timeout'
     except NameError:
       pass
     except uc.UcError as e:
       print('------CRASHED--------')
       print(e)
-      print('PC =', hex(self.emu.reg_read(uc.arm_const.UC_ARM_REG_PC)))
-    return self.ins_counter
+      print('PC =', hex(self._emu.reg_read(uc.arm_const.UC_ARM_REG_PC)))
+    return self._ins_counter
 
   def get_answer(self):
-    return self.answer
+    return self._answer
   
-  def int2ascii(self, value):
+  def _int2ascii(self, value):
     return (ord('0') + value).to_bytes(1, 'little')
 
   def send_read_slot(self, slot):
-    self.send('r', self.int2ascii(slot))
+    self.send('r', self._int2ascii(slot))
 
   def send_write_slot(self, slot, value):
-    self.send('w', self.int2ascii(slot),  str(value))
+    self.send('w', self._int2ascii(slot),  str(value))
   
   def send_increment_slot(self, slot):
-    self.send('i', self.int2ascii(slot))
+    self.send('i', self._int2ascii(slot))
 
