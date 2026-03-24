@@ -235,7 +235,8 @@ class App:
         command += bytes(arg, 'utf-8')
       else:
         command += arg
-
+    if len(command) > 0xFF:
+       raise OverflowError("command not sent: %d bytes exceed maximum of 255" % (len(command),))
     self._cmd_buf = len(command).to_bytes(1, 'little') + command
     self._cmd_idx = 0
     self._ins_counter = 0
