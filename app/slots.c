@@ -7,8 +7,8 @@
 #define ACCESS_W 2 /* authorization to write */
 #define ACCESS_RW (ACCESS_R|ACCESS_W)
 #define ACCESS_I 4 /* authorization to increment */
-#define ACCESS_L 8 /* access depends on global lock */ 
-#define ACCESS_ALL (ACCESS_RW|ACCESS_I|ACCESS_L)
+#define ACCESS_U 8 /* access unlocked: does not depend on global lock */ 
+#define ACCESS_ALL (ACCESS_RW|ACCESS_I|ACCESS_U)
 
 #define MAX_SLOT 8
 
@@ -32,13 +32,13 @@ static struct info_s info =
   .error = 0,
   .password = "2304",
   .slot = {
-	{'a', ACCESS_RW},
-	{'b', ACCESS_RW},
-	{'c', ACCESS_RW},
-	{100, ACCESS_R},
-	{'x', ACCESS_R|ACCESS_I},
-	{'y', ACCESS_RW|ACCESS_L},
-	{'z', ACCESS_R|ACCESS_L} }
+	{'a', ACCESS_RW|ACCESS_U},
+	{'b', ACCESS_RW|ACCESS_U},
+	{'c', ACCESS_RW|ACCESS_U},
+	{100, ACCESS_R|ACCESS_U},
+	{'x', ACCESS_R|ACCESS_I|ACCESS_U},
+	{'y', ACCESS_RW},
+	{'z', ACCESS_R} }
 };
 
 static unsigned int clear_error()
@@ -81,7 +81,7 @@ static unsigned int is_slot_ok(int slot, unsigned int access)
 	{
 		s = &info.slot[slot];
 		if (s && (s->access & access))
-      if(!islocked() || !(s->access & ACCESS_L))
+      if(!islocked() || (s->access & ACCESS_U))
           return !clear_error(); /* granted */
 	}
 	return !set_error();
@@ -173,7 +173,7 @@ static void print_status(void)
                 get_access_symbol(tmp,ACCESS_R,'R'), 
                 get_access_symbol(tmp,ACCESS_W,'W'), 
                 get_access_symbol(tmp,ACCESS_I,'I'), 
-                get_access_symbol(tmp,ACCESS_L,'L') 
+                get_access_symbol(tmp,ACCESS_U,'U') 
                 );
     }
     clear_error();
