@@ -3,11 +3,11 @@
 #include "slot.h"
 
 #define ACCESS_NO 0
-#define ACCESS_R 1
-#define ACCESS_W 2
-#define ACCESS_RW 3
-#define ACCESS_I 4
-#define ACCESS_L 8 /* access authorized even if locked */ 
+#define ACCESS_R 1 /* authorization to read */
+#define ACCESS_W 2 /* authorization to write */
+#define ACCESS_RW (ACCESS_R|ACCESS_W)
+#define ACCESS_I 4 /* authorization to increment */
+#define ACCESS_L 8 /* access depends on global lock */ 
 #define ACCESS_ALL (ACCESS_RW|ACCESS_I|ACCESS_L)
 
 #define MAX_SLOT 8
@@ -32,13 +32,13 @@ static struct info_s info =
   .error = 0,
   .password = "2304",
   .slot = {
-	{'a', ACCESS_RW|ACCESS_L},
-	{'b', ACCESS_RW|ACCESS_L},
-	{'c', ACCESS_RW|ACCESS_L},
-	{100, ACCESS_R|ACCESS_L},
-	{'x', ACCESS_R|ACCESS_I|ACCESS_L},
-	{'y', ACCESS_RW},
-	{'z', ACCESS_R} }
+	{'a', ACCESS_RW},
+	{'b', ACCESS_RW},
+	{'c', ACCESS_RW},
+	{100, ACCESS_R},
+	{'x', ACCESS_R|ACCESS_I},
+	{'y', ACCESS_RW|ACCESS_L},
+	{'z', ACCESS_R|ACCESS_L} }
 };
 
 static unsigned int clear_error()
@@ -81,7 +81,7 @@ static unsigned int is_slot_ok(int slot, unsigned int access)
 	{
 		s = &info.slot[slot];
 		if (s && (s->access & access))
-      if(!islocked() || (s->access & ACCESS_L))
+      if(!islocked() || !(s->access & ACCESS_L))
           return !clear_error(); /* granted */
 	}
 	return !set_error();
